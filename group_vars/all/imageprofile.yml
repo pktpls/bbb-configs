@@ -1,10 +1,24 @@
 ---
 # default OpenWRT version to build from unless overridden
 openwrt_version: 23.05-SNAPSHOT
-imagebuilder_filename: "openwrt-imagebuilder-{{ openwrt_version ~ '-' if openwrt_version != 'snapshot' else '' }}{{ target | replace('/','-') }}.Linux-x86_64.tar.xz"
-imagebuilder: "https://downloads.cdn.openwrt.org/{{ 'snapshots' if openwrt_version == 'snapshot' else 'releases/' ~ openwrt_version }}/targets/{{ target }}/{{ imagebuilder_filename }}"
-feed: "src/gz openwrt_falter https://firmware.berlin.freifunk.net/feed/__FEED_VERSION__/packages/__INSTR_SET__/falter"
 
+# openwrt_mirror: https://downloads.cdn.openwrt.org
+# openwrt_mirror: https://ftp.snt.utwente.nl/pub/software/lede
+openwrt_mirror: http://192.168.1.1/downloads.openwrt.org
+
+imagebuilder_filename: "openwrt-imagebuilder-{{ openwrt_version ~ '-' if openwrt_version != 'snapshot' else '' }}{{ target | replace('/','-') }}.Linux-x86_64.tar.xz"
+imagebuilder: "{{ openwrt_mirror }}/{{ 'snapshots' if openwrt_version == 'snapshot' else 'releases/' ~ openwrt_version }}/targets/{{ target }}/{{ imagebuilder_filename }}"
+
+# falter_mirror: https://firmware.berlin.freifunk.net
+# feed: "src/gz openwrt_falter {{ falter_mirror }}/feed/__FEED_VERSION__/packages/__INSTR_SET__/falter"
+
+# For using the offline mirror
+falter_mirror: http://192.168.1.1/firmware.berlin.freifunk.net
+
+# For local development
+# falter_mirror: file:///home/user/w/ff/falter-packages/out
+# feed: "src/gz openwrt_falter {{ falter_mirror }}/{{ openwrt_branch }}/__INSTR_SET__/falter"
+# imagebuilder_disable_signature_check: true
 
 all__packages__to_merge:
   - collectd-mod-interface
