@@ -1,12 +1,67 @@
 #!/usr/bin/env bash
 
+#
+# This inventory script translates our data model to Ansible's data model.
+# We have one file per network location, and one or more hosts per location.
+# Ansible has groups and hosts, with one file per host, which isn't practical.
+#
+# The output is a JSON object containing an array of all host names,
+# and an array with the initial hostvars for each host.
+#
+# See https://docs.ansible.com/ansible/latest/dev_guide/developing_inventory.html
+#
+# The queries and conversions are done with the help of the `jq` and `yq` tools.
+#
+# We first grab the JSON representation of every location YML definition,
+# then read `.hosts[].hostname` for each location to create the list of all hosts.
+# We also scan the `host_vars/` directory for backward compatibility.
+#
+# Usually Ansible then calls this script with `--host <name>` for every host.
+# That would obviously get very slow with hundreds of hosts,
+# which is why Ansible lets us construct all hostvars objects in advance.
+#
+# To construct the hostvars object for a host,
+# we take as a base the full location object (without `.hosts`),
+# then merge the object from `.hosts[]` with a matching `hostname` value.
+# Host values overwrite location values.
+# (We actually merge host<-location<-host to preserve JSON ordering.)
+#
+# In total there are five stages to construct inventory and hostvars:
+#
+# 1. This inventory script
+#
+# 2. `host_vars/`
+#     Old hosts in `host_vars/` don't need the conversion in this script,
+#     they're still loaded by Ansible automatically.
+#
+# 3. Keyed groups
+#     The next two stages after inventory construction handle keyed groups,
+#     which load additional group data based on certain property values.
+#     This is handled outside of this script by an Ansible plugin.
+#     There are two stages so that new data from stage 1 can set properties
+#     that result in more new data in stage 2 (e.g. `model` and OpenWrt version).
+#     The first stage handles `location` (old), `target`, `model`, and `role`,
+#     while the second handles `target` and `openwrt_version`.
+#
+# 4. Merge vars
+#     The last stage is the `merge_vars` task.
+#     All hostvars construction so far was only able to overwrite properties.
+#     In some cases we need to merge with the existing property.
+#     For specific properties, a "merge var" can be set:
+#     `packages: ["some-pkg"]` and `xxx__packages__to_merge: ["another-pkg"]`
+#     where `xxx` is an arbitrary name to allow for multiple merge vars.
+#     Before any templates or tasks make use of hostvars,
+#     these merge vars are merged together into one.
+#     Applies to `ssh_keys`, `packages`, `sysctl`, `rclocal`,
+#     `disabled_services`, `wireless_profiles`, `channel_assignments_*`
+#
+
 set -e
 # set -x
 
 case "$1" in
 --host)
-    # No op - won't be called by Ansible anymore because --list contains all data.
-    # See https://docs.ansible.com/ansible/latest/dev_guide/developing_inventory.html#tuning-the-external-inventory-script
+    # No op
     echo "{}"
     exit 0
     ;;
