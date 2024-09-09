@@ -14,65 +14,18 @@ hosts:
     model: "avm_fritzbox-7530"
     wireless_profile: freifunk_default
 
-  # Special vlan config:
-  # - kub-ap1 vlan 40: 0t 1t 2 3 4
   - hostname: kub-ap1
     role: ap
     model: "cudy_x6-v1"
+    ports:
+      dhcp: lan1 lan2 lan3 lan4 wan:t
+      mgmt: lan1:t lan2:t lan3:t lan4:t wan:t
     openwrt_version: snapshot
     # imagebuilder: /home/user/w/ff/bbb-configs/openwrt-imagebuilder-ramips-mt7621.Linux-x86_64.tar.zst
     log_size: 1024
     host__rclocal__to_merge:
       - 'echo 1 > /sys/kernel/debug/ieee80211/phy0/mt76/fw_debug_wm'
       - 'echo 1 > /sys/kernel/debug/ieee80211/phy1/mt76/fw_debug_wm'
-      - ''
-      - '#'
-      - '# This script adjusts the configuration of vlans. This is especially'
-      - '# useful with uswflex and custom port configs'
-      - '#'
-      - ''
-      - '. /lib/functions.sh'
-      - ''
-      - 'handle_vlans() {'
-      - '  # untag the vlans on different ports based on their id'
-      - '  local uci_section="$1"'
-      - ''
-      - '  config_get vlan "$uci_section" vlan'
-      - '  config_get ports "$uci_section" ports'
-      - ''
-      - ''
-      - '  case "$vlan" in'
-      - '    40)'
-      - '      # untag DHCP on LAN 1 and LAN 2'
-      - "      port_config='wan:t lan1 lan2 lan3:t lan4:t'"
-      - '      ;;'
-      - '    *)'
-      - '      # do nothing for the other vlans'
-      - '      printf "Done.\n"'
-      - '      return'
-      - '  esac'
-      - ''
-      - '  # abort if config is applied already'
-      - '  if [ "$ports" = "$port_config" ]; then'
-      - '    printf "Vlan %d applied already.\n" "$vlan"'
-      - '    return'
-      - '  fi'
-      - ''
-      - '  printf "Port number: %d\n" "$vlan"'
-      - '  printf "Port config: %s\n" "$port_config"'
-      - ''
-      - '  printf "Configuring %s... " "$uci_section"'
-      - '  uci_set network "$uci_section" ports "$port_config"'
-      - '  printf "Done.\n"'
-      - '}'
-      - ''
-      - 'config_load network'
-      - ''
-      - 'config_foreach handle_vlans "bridge-vlan"'
-      - ''
-      - 'uci commit network'
-      - 'sync'
-      - 'reload_config'
     ssl__packages__to_merge: []
 
 snmp_devices:
