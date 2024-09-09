@@ -2,6 +2,13 @@
 {% set profile = wireless_profiles | selectattr('name', 'equalto', wireless_profile) | list | first %}
 {% set wifi_networks = profile | json_query('ifaces[].network') | default([], true) %}
 
+{% for i in mac_override|default({}) %}
+config device '{{ i }}_dev'
+  option name '{{ i }}'
+  option macaddr '{{ mac_override[i] }}'
+
+{% endfor %}
+
 config interface 'loopback'
 	option device 'lo'
 	option proto 'static'
@@ -20,6 +27,14 @@ config interface 'loopback'
 
 {% for network in networks | selectattr('vid', 'defined') %}
   {% set name = network['name'] if 'name' in network else network['role'] %}
+  {% set net_has_assignment = 'assignments' in network and inventory_hostname in network['assignments'] %}
+  {% set net_wifi = name in wifi_networks %}
+  {% set net_mesh_core = role == 'corerouter' and network['role'] == 'mesh' %}
+  {% set net_mesh_ap = network.get('mesh_ap') == inventory_hostname %}
+  {% set net_tunnelmanager = role == 'corerouter' and 'tunnel_wan_ip' in network %}
+  {% set net_tunspace = role == 'corerouter' and network['role'] == 'uplink' %}
+  {% if not (net_has_assignment or net_wifi or net_mesh_core or net_mesh_ap or net_tunnelmanager or net_tunspace) %}{% continue %}{% endif %}
+
   {% set vid = network['vid']|string %}
   {% set untagged = network.get('untagged') %}
   {% if 'ifname' in network %}
@@ -32,15 +47,19 @@ config interface 'loopback'
     {% set port = int_port + ('' if untagged else '.' + vid) %}
   {% endif %}
   {% set bridge_name = 'br-' + name %}
-  {% set bridge_needed = name in wifi_networks or network.get('mesh_ap') == inventory_hostname or (role == 'corerouter' and 'tunnel_wan_ip' in network) or (role == 'corerouter' and network['role'] == 'uplink') %}
-  {% set port_needed = not (role == 'corerouter' and network.get('mesh_ap') == inventory_hostname) %}
+  {% set bridge_needed = net_wifi or net_mesh_ap or (net_tunnelmanager) or (net_tunspace) %}
+  {% set port_needed = not (role == 'corerouter' and net_mesh_ap) %}
 
-  {%- if (role == 'corerouter' and network['role'] == 'mesh') or ('assignments' in network and inventory_hostname in network['assignments'])
-     or name in wifi_networks
-     or network.get('mesh_ap') == inventory_hostname
-     or (role == 'corerouter' and 'tunnel_wan_ip' in network)
-     or (role == 'corerouter' and network['role'] == 'uplink')
-     %}
+  {% if port_needed and bridge_needed %}
+config device
+  option name '{{ (bridge_name if bridge_name | length <= 15) | mandatory('The generated inteface name exceeds the 15 characters limit of the linux kernel. Try to shorten the name to resolve this.') }}'
+        option type 'bridge'
+    {% if network.get('enforce_client_isolation') and role == 'corerouter' %}
+  option macaddr '02:00:00:00:00:01'
+    {% endif %}
+  list ports '{{ port }}'
+  {% endif %}
+
 config interface '{{ name }}'
     {% if port_needed %}
         {% if bridge_needed %}
@@ -53,7 +72,7 @@ config interface '{{ name }}'
           not bridge_needed %}
 	option macaddr '02:00:00:00:00:01'
     {% endif %}
-    {% if 'assignments' in network and inventory_hostname in network['assignments'] %}
+    {% if net_has_assignment %}
 	option proto 'static'
 	option ipaddr '{{ network['prefix'] | ansible.utils.ipaddr(network['assignments'][inventory_hostname]) }}'
 	{% if role != "corerouter" and 'dns' in network %}
@@ -63,41 +82,24 @@ config interface '{{ name }}'
 	option gateway '{{ network['prefix'] | ansible.utils.ipaddr(network['gateway']) | ansible.utils.ipaddr('address') }}'
         {% endif %}
         {% if role != 'corerouter' and 'ipv6_subprefix' in network %}
-
 # IPv6 Address comes via SLAAC and RA. See sysctl, there it is enabled
 # The reason is to get rid of the userspace daemon
 #config interface '{{ name }}6'
 #	option device '@{{ name }}'
 #	option proto 'dhcpv6'
         {% endif %}
-    {% elif role == 'corerouter' and network['role'] == 'mesh' %}
+    {% elif net_mesh_core %}
 	option proto 'static'
 	option ipaddr '{{ network['prefix'] }}'
     {% else %}
 	option proto 'none'
     {% endif %}
-  {% endif %}
+
   {% if role == 'corerouter' and ipv6_prefix is defined %}
     {% if 'ipv6_subprefix' in network %}
       {% set subprefix = ipv6_prefix | ansible.utils.ipsubnet('64', network['ipv6_subprefix']) %}
 	option ip6addr '{{ subprefix | ansible.utils.ipaddr(1) | ansible.utils.ipaddr('address') }}/{{ '128' if network['role'] == 'mesh' else '64' }}'
     {% endif %}
   {% endif %}
-
-  {% if port_needed and bridge_needed %}
-config device
-	option name '{{ (bridge_name if bridge_name | length <= 15) | mandatory('The generated inteface name exceeds the 15 characters limit of the linux kernel. Try to shorten the name to resolve this.') }}'
-        option type 'bridge'
-    {% if network.get('enforce_client_isolation') and role == 'corerouter' %}
-	option macaddr '02:00:00:00:00:01'
-    {% endif %}
-	list ports '{{ port }}'
-  {% endif %}
-
-{% endfor %}
-{% for i in mac_override|default({}) %}
-config device '{{ i }}_dev'
-	option name '{{ i }}'
-	option macaddr '{{ mac_override[i] }}'
 
 {% endfor %}
