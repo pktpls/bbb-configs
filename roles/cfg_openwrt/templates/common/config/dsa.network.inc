@@ -1,6 +1,6 @@
 config device
-	option type 'bridge'
-	option name 'switch0'
+  option type 'bridge'
+  option name 'switch0'
 
 {% for network in networks | selectattr('vid', 'defined') | selectattr('ifname', 'undefined') %}
   {% set portmapping = [] %}
@@ -10,7 +10,7 @@ config device
   {%- endfor %}
 
 config bridge-vlan
-	option device 'switch0'
-	option vlan '{{ network['vid'] }}'
-	option ports '{{ portmapping|join(' ') }}'
+  option device 'switch0'
+  option vlan '{{ network['vid'] }}'
+  option ports '{{ portmapping|join(' ') }}'
 {% endfor %}

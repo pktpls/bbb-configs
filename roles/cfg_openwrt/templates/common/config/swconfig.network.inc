@@ -1,7 +1,7 @@
 config switch
-	option name 'switch0'
-	option reset '1'
-	option enable_vlan '1'
+  option name 'switch0'
+  option reset '1'
+  option enable_vlan '1'
 
 {% for network in networks | selectattr('vid', 'defined') | selectattr('ifname', 'undefined') %}
   {% set portmapping = [] %}
@@ -11,9 +11,7 @@ config switch
   {%- endfor %}
 
 config switch_vlan
-	option device 'switch0'
-	option vlan '{{ network['vid'] }}'
-	option ports '{{ portmapping|join(' ') }}'
+  option device 'switch0'
+  option vlan '{{ network['vid'] }}'
+  option ports '{{ portmapping|join(' ') }}'
 {% endfor %}
-
-
