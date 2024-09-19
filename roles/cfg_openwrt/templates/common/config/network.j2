@@ -105,6 +105,15 @@ config interface '{{ name }}'
     {% endif %}
   {% endif %}
 
+  {% if 'wwan' in network %}
+config interface 'wwan'
+    {% set wwan = network['wwan'] %}
+	option proto '{{ wwan['proto'] }}'
+	option device '{{ wwan['device'] }}'
+	option apn '{{ wwan['apn'] }}'
+	option pdptype '{{ wwan['pdptype'] }}'
+  {% endif %}
+
   {% if port_needed and bridge_needed %}
 config device
 	option name '{{ (bridge_name if bridge_name | length <= 15) | mandatory('The generated inteface name exceeds the 15 characters limit of the linux kernel. Try to shorten the name to resolve this.') }}'
