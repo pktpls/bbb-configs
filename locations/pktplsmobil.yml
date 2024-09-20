@@ -18,6 +18,8 @@ hosts:
   - hostname: pktplsmobil-core
     role: corerouter
     model: "glinet_gl-xe300"
+    openwrt_version: snapshot
+    feed: "src/gz openwrt_falter https://firmware.berlin.freifunk.net/feed/testbuildbot/packages/mips_24kc/falter"
     wireless_profile: pktplsmobil
 
 # 10.248.17.128/25
