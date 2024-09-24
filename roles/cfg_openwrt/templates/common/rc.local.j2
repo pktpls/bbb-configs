@@ -1,6 +1,13 @@
 # Put your custom commands here that should be executed once
 # the system init finished. By default this file does nothing.
 
+# from falter-common
+[ -d /etc/rc.local.d ] && {
+  for file in /etc/rc.local.d/*; do
+    test -f "$file" && . "$file"
+  done
+}
+
 NFT_CONF="/etc/nftables.conf"
 if [[ -f "$NFT_CONF" ]]; then
     # sleep in order to make sure all interfaces are created
