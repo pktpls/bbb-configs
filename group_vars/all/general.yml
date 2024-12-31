@@ -30,6 +30,9 @@ sysupgrade_preserve_custom_files:
   - /etc/dropbear/dropbear_ed25519_host_key
   - /root/
 
+# Custom inlined files specific to a host, location, or model
+all__files__to_merge: []
+
 image_search_pattern: "*-sysupgrade.*"
 
 all__sysctl__to_merge:

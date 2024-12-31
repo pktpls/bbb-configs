@@ -179,6 +179,20 @@
     line: "{{ item }}::askfirst:/usr/libexec/login.sh"
   loop: "{{ additional_serial_ports | default([]) }}"
 
+- name: Add custom extra files directories
+  file:
+    path: "{{ configs_dir }}{{ item.path | dirname }}"
+    state: directory
+    mode: '0755'
+  loop: "{{ files }}"
+
+- name: Add custom extra files
+  copy:
+    dest: "{{ configs_dir }}{{ item.path }}"
+    mode: "{{ item.mode | default('0644') }}"
+    content: "{{ item.content }}"
+  loop: "{{ files }}"
+
 - name: Debug Imagebuilder command again
   debug:
     var: make_command
