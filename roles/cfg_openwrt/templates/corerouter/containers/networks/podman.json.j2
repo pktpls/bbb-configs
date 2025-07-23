@@ -1,0 +1,31 @@
+{%- for network in networks | selectattr('role', 'equalto', 'podman') | batch(1) | first %}
+     {%- set name = network['name'] | default('podman') %}
+     {%- set ifname = network['ifname'] %}
+     {%- set prefix6 = ipv6_prefix | ansible.utils.ipsubnet('64', network['ipv6_subprefix']) %}
+     {%- set gateway6 = prefix6 | ansible.utils.ipaddr(1) | ansible.utils.ipaddr('address') %}
+     {%- set prefix4 = network['prefix'] %}
+     {%- set gateway4 = prefix4 | ansible.utils.ipaddr(network['gateway'] | default(1)) | ansible.utils.ipaddr('address') %}
+{
+     "name": "{{ name }}",
+     "id": "4899b42442372b0a1788ff4a94df70be628ca5c228f64eea518e59b797d6d3e1",
+     "driver": "bridge",
+     "network_interface": "{{ ifname }}",
+     "created": "2024-12-23T00:00:00.000000000Z",
+     "subnets": [
+          {
+               "subnet": "{{ prefix6 }}",
+               "gateway": "{{ gateway6 }}"
+          },
+          {
+               "subnet": "{{ prefix4 }}",
+               "gateway": "{{ gateway4 }}"
+          }
+     ],
+     "ipv6_enabled": true,
+     "internal": false,
+     "dns_enabled": true,
+     "ipam_options": {
+          "driver": "host-local"
+     }
+}
+{% endfor %}

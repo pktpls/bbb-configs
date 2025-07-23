@@ -99,6 +99,12 @@ config device
 	list ports '{{ libnetwork.getPortIfname(network) }}'
   {% endif %}
 
+  {% if role == 'corerouter' and network['role'] == 'podman' %}
+config interface '{{ name }}'
+  option device '{{ network['ifname'] | default('podman0') }}'
+  option proto 'external'
+  {% endif %}
+
 {% endfor %}
 {% if role == 'corerouter' %}
 {% for network in networks | selectattr('role', 'equalto', 'wireless_uplink') %}

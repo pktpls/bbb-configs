@@ -22,7 +22,7 @@
 
 {# Retrieve the Port Name of a network. This is either a physical vlan subinterface, or the switch vlan subinterface from DSA #}
 {% macro getPortIfname(network) %}
-    {% set vid = network['vid']|string %}
+    {% set vid = network.get('vid')|string %}
     {% set untagged = network.get('untagged') %}
     {% if 'ifname' in network %}
         {% set port = network['ifname'] + ('' if untagged else '.' + vid) %}

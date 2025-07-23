@@ -4,6 +4,7 @@
 {% set query = "[].{name: name||role,inbound_filtering: inbound_filtering}" %}
 {% set l3_networks = (l3_networks + l3_mesh_networks) | json_query(query) %}
 {% set zone_freifunk_networks = l3_networks | rejectattr('inbound_filtering') | map(attribute='name') %}
+{% set podman_networks = networks | selectattr('role', 'equalto', 'podman') %}
 
 config defaults
 	option synflood_protect '1'
@@ -22,6 +23,9 @@ config zone 'zone_freifunk'
 	option name 'freifunk'
 	{% for name in zone_freifunk_networks %}
 	list network '{{ name }}'
+	{% endfor %}
+	{% for n in podman_networks %}
+	list network '{{ n['name'] | default(n['role']) }}'
 	{% endfor %}
 	list device 'wg_+'
 	list device 'ts_+'

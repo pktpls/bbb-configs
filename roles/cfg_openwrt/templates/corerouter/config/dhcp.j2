@@ -20,6 +20,9 @@ config dnsmasq
 {% for _dns_server in dns_servers %}
         list server '{{ _dns_server }}'
 {% endfor %}
+{% for network in networks | selectattr('role', 'equalto', 'podman') %}
+	list notinterface '{{ network['ifname'] }}'
+{% endfor %}
 
 {% for network in networks | selectattr('role', 'equalto', 'mgmt') %}
   {% for host, ip_num in network['assignments'].items() %}
@@ -30,7 +33,7 @@ config domain '{{ host | replace('-', '_') }}_ff'
   {% endfor %}
 {% endfor %}
 
-{% for network in networks | rejectattr('role', 'in', ['uplink', 'wireless_uplink', 'mesh', 'tunnel', 'ext']) %}
+{% for network in networks | rejectattr('role', 'in', ['uplink', 'wireless_uplink', 'mesh', 'tunnel', 'ext', 'podman']) %}
     {% set name = libnetwork.getUciIfname(network) %}
 
 config dhcp 'dhcp_{{ name }}'
