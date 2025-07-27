@@ -25,9 +25,11 @@ hosts:
     host__packages__to_merge:
       - bash rsync screen tmux htop mtr git git-http curl jq
       - parted fdisk e2fsprogs btrfs-progs losetup resize2fs coreutils-shred blkid
-      - podman conmon crun catatonit netavark external-protocol
+      - podman kmod-tun kmod-fuse conmon crun catatonit netavark external-protocol
     host__rclocal__to_merge:
       - "sed -i 's|#firewall_driver|firewall_driver|g' /etc/containers/containers.conf"
+      - "sed -i 's|runroot = \".*\"|runroot = \"/opt/run/containers/storage\"|g' /etc/containers/storage.conf"
+      - "sed -i 's|graphroot = \".*\"|graphroot = \"/opt/var/lib/containers/storage\"|g' /etc/containers/storage.conf"
       - "/etc/init.d/mirror enable ; /etc/init.d/mirror start"
     host__files__to_merge:
       - path: /etc/init.d/mirror
@@ -69,6 +71,190 @@ hosts:
           stop_service() {
             podman kill $name
           }
+      - path: /etc/uci-defaults/70-rootpt-resize
+        content: |
+          if [ ! -e /etc/rootpt-resize ] \
+          && type parted > /dev/null \
+          && lock -n /var/lock/root-resize
+          then
+          ROOT_BLK="$(readlink -f /sys/dev/block/"$(awk -e \
+          '$9=="/dev/root"{print $3}' /proc/self/mountinfo)")"
+          ROOT_DISK="/dev/$(basename "${ROOT_BLK%/*}")"
+          ROOT_PART="${ROOT_BLK##*[^0-9]}"
+          parted -f -s "${ROOT_DISK}" \
+          resizepart "${ROOT_PART}" 100%
+          mount_root done
+          touch /etc/rootpt-resize
+          if [ -e /boot/cmdline.txt ]
+          then
+          NEW_UUID=`blkid ${ROOT_DISK}p${ROOT_PART} | sed -n 's/.*PARTUUID="\([^"]*\)".*/\1/p'`
+          sed -i "s/PARTUUID=[^ ]*/PARTUUID=${NEW_UUID}/" /boot/cmdline.txt
+          fi
+          reboot
+          fi
+          exit 1
+      - path: /etc/uci-defaults/80-rootfs-resize
+        content: |
+          if [ ! -e /etc/rootfs-resize ] \
+          && [ -e /etc/rootpt-resize ] \
+          && type losetup > /dev/null \
+          && type resize2fs > /dev/null \
+          && lock -n /var/lock/root-resize
+          then
+          ROOT_BLK="$(readlink -f /sys/dev/block/"$(awk -e \
+          '$9=="/dev/root"{print $3}' /proc/self/mountinfo)")"
+          ROOT_DEV="/dev/${ROOT_BLK##*/}"
+          LOOP_DEV="$(awk -e '$5=="/overlay"{print $9}' \
+          /proc/self/mountinfo)"
+          if [ -z "${LOOP_DEV}" ]
+          then
+          LOOP_DEV="$(losetup -f)"
+          losetup "${LOOP_DEV}" "${ROOT_DEV}"
+          fi
+          resize2fs -f "${LOOP_DEV}"
+          mount_root done
+          touch /etc/rootfs-resize
+          reboot
+          fi
+          exit 1
+      - path: /usr/share/buildbot/Dockerfile
+        content: |
+          FROM        docker.io/library/debian:12
+          MAINTAINER  pktpls@systemli.org
+          ARG         DEBIAN_FRONTEND=noninteractive
+          ARG         BUILDBOT_VERSION=4.3.0
+          USER root
+          RUN apt-get update && apt-get install -y podman sudo vim build-essential ccache curl file gawk g++-multilib gcc-multilib genisoimage git-core gosu libdw-dev libelf-dev libncurses5-dev locales pv pwgen python3 python3-venv python3-pip python3-pyelftools python3-cryptography qemu-utils rsync signify-openbsd subversion swig unzip wget zstd && apt-get clean && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+          RUN python3 -m venv /opt/venv
+          ENV PATH="/opt/venv/bin:$PATH"
+          RUN pip3 install -U pip
+          RUN pip3 install "buildbot-worker==$BUILDBOT_VERSION" pyelftools pyOpenSSL service_identity
+          ENV LANG=en_US.utf8
+          COPY entry.sh /entry.sh
+          COPY start.sh /start.sh
+          RUN echo "buildbot ALL=(root) NOPASSWD: /usr/bin/podman" > /etc/sudoers.d/buildbot-podman
+          RUN groupadd buildbot && useradd --create-home --home-dir /builder --comment "Freifunk Berlin buildbot" --gid buildbot --shell /bin/bash buildbot && chown buildbot:buildbot /builder && chmod 0755 /entry.sh /start.sh
+          VOLUME [ "/builder" ]
+          ENTRYPOINT [ "/entry.sh" ]
+          CMD [ "/start.sh" ]
+      - path: /usr/share/buildbot/entry.sh
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          chown buildbot:buildbot /builder
+          /usr/sbin/gosu buildbot "$@"
+      - path: /usr/share/buildbot/start.sh
+        mode: '0755'
+        content: |
+          #!/usr/bin/env bash
+          cleanup_buildworker_env_variables() {
+            for var in "${!BUILDWORKER_@}"; do
+              unset "$var"
+            done
+          }
+          [ -n "$BUILDWORKER_NAME" ] || {
+            echo "Please supply a name via --env BUILDWORKER_NAME=XXX" >&2
+            exit 1
+          }
+          [ -n "$BUILDWORKER_PASSWORD" ] || {
+            echo "Please supply a password via --env BUILDWORKER_PASSWORD=XXX" >&2
+            exit 2
+          }
+          rm -f /builder/buildbot.tac
+          /opt/venv/bin/buildbot-worker create-worker \
+            --force \
+            --umask="0o22" \
+            ${BUILDWORKER_TLS:+--connection-string="SSL:$BUILDWORKER_MASTER"} \
+            /builder \
+            "$BUILDWORKER_MASTER" \
+            "$BUILDWORKER_NAME" \
+            "$BUILDWORKER_PASSWORD"
+          echo "$BUILDWORKER_ADMIN" > /builder/info/admin
+          echo "$BUILDWORKER_DESCRIPTION" > /builder/info/host
+          cleanup_buildworker_env_variables
+          rm -f /builder/twistd.pid
+          exec /opt/venv/bin/buildbot-worker start --nodaemon /builder
+      - path: /usr/share/buildbot/init.sh
+        mode: '0644'
+        content: |
+          start_service() {
+            podman pull -q --retry=3 --retry-delay=5s docker.io/library/debian:11 >/dev/null
+            img=$(podman build -q /usr/share/buildbot)
+            echo "image: $img"
+            procd_open_instance
+            procd_set_param command /usr/bin/podman run --rm -i \
+              --security-opt label=disable --security-opt unmask=ALL \
+              --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN \
+              --cap-add CAP_SYS_RESOURCE --cap-add CAP_MKNOD \
+              --device /dev/fuse --device /dev/net/tun \
+              --privileged --device /dev/net/tun \
+              --ip6 $ip6 --ip $ip4 --dns $dns --no-hosts \
+              -e BUILDWORKER_NAME=$name \
+              -e BUILDWORKER_PASSWORD=$password \
+              -e BUILDWORKER_MASTER=buildbot.berlin.freifunk.net \
+              -e BUILDWORKER_ADMIN=pktpls@systemli.org \
+              -e BUILDWORKER_DESCRIPTION="Container testing" \
+              --name $name $img
+            procd_set_param respawn 60 10 0  # respawn indefinitely, wait 10s before retry
+            procd_set_param stdout 1
+            procd_set_param stderr 1
+            procd_close_instance
+          }
+          stop_service() {
+            podman kill $name
+          }
+      - path: /etc/init.d/podtwo-buildbot1
+        mode: '0755'
+        content: |
+          #!/bin/sh /etc/rc.common
+          USE_PROCD=1
+          START=99
+          STOP=1
+          name="podtwo-buildbot1"
+          password="trustno1"
+          ip6="2001:bf7:820:3402::3"
+          ip4="10.248.33.75"
+          dns="10.248.33.73"
+          . /usr/share/buildbot/init.sh
+      - path: /etc/init.d/podtwo-buildbot2
+        mode: '0755'
+        content: |
+          #!/bin/sh /etc/rc.common
+          USE_PROCD=1
+          START=99
+          STOP=1
+          name="podtwo-buildbot2"
+          password="trustno1"
+          ip6="2001:bf7:820:3402::4"
+          ip4="10.248.33.76"
+          dns="10.248.33.73"
+          . /usr/share/buildbot/init.sh
+      - path: /etc/init.d/podtwo-buildbot3
+        mode: '0755'
+        content: |
+          #!/bin/sh /etc/rc.common
+          USE_PROCD=1
+          START=99
+          STOP=1
+          name="podtwo-buildbot3"
+          password="trustno1"
+          ip6="2001:bf7:820:3402::5"
+          ip4="10.248.33.77"
+          dns="10.248.33.73"
+          . /usr/share/buildbot/init.sh
+      - path: /etc/init.d/podtwo-buildbot4
+        mode: '0755'
+        content: |
+          #!/bin/sh /etc/rc.common
+          USE_PROCD=1
+          START=99
+          STOP=1
+          name="podtwo-buildbot4"
+          password="trustno1"
+          ip6="2001:bf7:820:3402::6"
+          ip4="10.248.33.78"
+          dns="10.248.33.73"
+          . /usr/share/buildbot/init.sh
 
 # 10.248.33.64/27 - pktpls+bbb@systemli.org
 # - 10.248.33.64/29 - mgmt
