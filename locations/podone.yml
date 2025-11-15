@@ -15,8 +15,12 @@ hosts:
   # eth0: 2.5G RTL8125B from mainboard
   - hostname: podone
     role: corerouter
-    openwrt_version: 24.10-SNAPSHOT
     model: "x86-64"
+    openwrt_version: snapshot
+    feed_version: testbuildbot
+    bird__packages__to_merge:
+      - bird3-babelpatch
+      - bird3c
     image_search_pattern: "*-ext4-combined-efi.img*"
     imagebuilder_config:
       CONFIG_TARGET_ROOTFS_PARTSIZE: 256
