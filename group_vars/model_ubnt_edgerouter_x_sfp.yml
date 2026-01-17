@@ -3,7 +3,7 @@ target: ramips/mt7621
 brand_nice: Ubiquiti
 model_nice: EdgeRouter X SFP
 
-openwrt_version: 23.05-SNAPSHOT
+openwrt_version: 23.05.6
 
 dsa_ports:
   - eth0
