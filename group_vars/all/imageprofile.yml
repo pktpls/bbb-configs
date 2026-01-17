@@ -9,6 +9,7 @@ imagebuilder: >
   https://downloads.cdn.openwrt.org/{{
   'snapshots' if openwrt_version == 'snapshot' else 'releases/' ~ openwrt_version
   }}/targets/{{ target }}/{{ imagebuilder_filename }}
+instr_set: TODO
 feed: "src/gz openwrt_falter https://firmware.berlin.freifunk.net/feed/{{ feed_version }}/packages/{{ instr_set }}/falter"
 
 # The packages list is spread over a number of lists for two reasons:

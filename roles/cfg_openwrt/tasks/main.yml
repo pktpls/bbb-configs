@@ -1,10 +1,38 @@
 ---
+
+- name: Prepare directories variables
+  set_fact:
+    configs_dir: "{{ playbook_dir }}/tmp/configs/{{ inventory_hostname }}"
+    dl_dir: "{{ playbook_dir }}/tmp/dl"
+    build_dir: "{{ playbook_dir }}/tmp/build/{{ inventory_hostname }}"
+    images_dir: "{{ playbook_dir }}/tmp/images"
+    wikiupdater_dir: "{{ playbook_dir }}/tmp/wikiupdater"
+  tags: always
+
+- name: Create directories
+  file:
+    path: "{{ item }}"
+    state: directory
+    mode: "755"
+  tags: always
+  loop:
+    - "{{ configs_dir }}"
+    - "{{ dl_dir }}"
+    - "{{ build_dir }}"
+    - "{{ images_dir }}"
+    - "{{ wikiupdater_dir }}"
+
 - name: Include tasks for conditional packages
   include_tasks:
     file: conditional_packages.yml
     apply:
       tags: always
   tags: always
+
+- name: Debug hostvars before merge_vars
+  copy:
+    dest: "{{ images_dir }}/{{ inventory_hostname }}.early.json"
+    content: "{{ hostvars[inventory_hostname] | rejectattr('key','matches','__to_merge') to_json(indent=2) }}"
 
 - name: Include tasks for merging variables
   include_tasks:
@@ -13,19 +41,10 @@
       tags: always
   tags: always
 
-- name: Prepare some variables (1)
-  set_fact:
-    basedir: "{{ playbook_dir }}/tmp"
-  tags: always
-
-- name: Prepare some variables
-  set_fact:
-    configs_dir: "{{ basedir }}/configs/{{ inventory_hostname }}"
-    dl_dir: "{{ basedir }}/dl/"
-    build_dir: "{{ basedir }}/build/{{ inventory_hostname }}"
-    images_dir: "{{ basedir }}/images/"
-    wikiupdater_dir: "{{ basedir }}/wikiupdater/"
-  tags: always
+- name: Debug hostvars after merge_vars
+  copy:
+    dest: "{{ images_dir }}/{{ inventory_hostname }}.final.json"
+    content: "{{ hostvars[inventory_hostname] | to_json(indent=2) }}"
 
 - name: Create directory
   file:
