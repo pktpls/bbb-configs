@@ -123,12 +123,12 @@ hosts:
           exit 1
       - path: /usr/share/buildbot/Dockerfile
         content: |
-          FROM        docker.io/library/debian:12
+          FROM        docker.io/library/debian:testing
           MAINTAINER  pktpls@systemli.org
           ARG         DEBIAN_FRONTEND=noninteractive
           ARG         BUILDBOT_VERSION=4.3.0
           USER root
-          RUN apt-get update && apt-get install -y podman sudo vim build-essential ccache curl file gawk g++-multilib gcc-multilib genisoimage git-core gosu libdw-dev libelf-dev libncurses5-dev locales pv pwgen python3 python3-venv python3-pip python3-pyelftools python3-cryptography qemu-utils rsync signify-openbsd subversion swig unzip wget zstd && apt-get clean && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+          RUN apt-get update && apt-get install -y podman sudo vim build-essential ccache curl file gawk g++-multilib gcc-multilib genisoimage git-core gosu libdw-dev libelf-dev libncurses5-dev locales pv pwgen python3 python3-venv python3-pip python3-pyelftools python3-cryptography qemu-utils rsync signify-openbsd subversion swig unzip wget zstd && apt-get clean && touch /usr/share/locale/locale.alias && localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
           RUN python3 -m venv /opt/venv
           ENV PATH="/opt/venv/bin:$PATH"
           RUN pip3 install -U pip
@@ -187,11 +187,11 @@ hosts:
             echo "image: $img"
             procd_open_instance
             procd_set_param command /usr/bin/podman run --rm -i \
+              --pids-limit=0 \
               --security-opt label=disable --security-opt unmask=ALL \
               --cap-add CAP_SYS_ADMIN --cap-add CAP_NET_ADMIN \
               --cap-add CAP_SYS_RESOURCE --cap-add CAP_MKNOD \
               --device /dev/fuse --device /dev/net/tun \
-              --privileged --device /dev/net/tun \
               --ip6 $ip6 --ip $ip4 --dns $dns --no-hosts \
               -e BUILDWORKER_NAME=$name \
               -e BUILDWORKER_PASSWORD=$password \
