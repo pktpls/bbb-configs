@@ -17,7 +17,9 @@ hosts:
     role: corerouter
     model: "x86-64"
     openwrt_version: snapshot
-    feed_version: testbuildbot
+    role_corerouter__packages__to_merge:
+      - bgpdisco
+      - bgpdisco-plugin-nameservice
     bird__packages__to_merge:
       - bird3-babelpatch
       - bird3c
