@@ -1,0 +1,55 @@
+---
+
+location: lause
+contacts:
+  - ag-digital@lists.lause.berlin
+  - noc@stadtfunk.net
+
+hosts:
+
+  - hostname: lause-core
+    role: corerouter
+    model: lenovo_thinkcentre-mlx
+
+  - hostname: lause-switch
+    role: switch
+    model: hasivo_f5800w-12s-plus
+    ports:
+      lan1:
+        trunk: true
+        tagged: [mgmt, dhcp]
+
+  - hostname: lause-og1-switch
+    role: switch
+    model: hasivo_s1300wp-8xgt-4s-plus
+    ports:
+      # lan1 -> lause-og1-ap1
+      lan1:
+        poe: auto
+        tagged: [mgmt, dhcp]
+      # lan2 -> lause-simeon airfiber
+      lan2:
+        poe: 48v
+        tagged: []
+        untagged: mesh_simeon
+      # lan11 -> ffraum
+      lan11:
+        tagged: [mgmt, mgmtffraum]
+        untagged: mesh_ffraum
+      # lan12 -> lan4@lause-switch
+      lan12:
+        trunk: true
+
+networks:
+
+  - vid: 40
+    name: dhcp
+    role: dhcp
+
+  - vid: 442
+    name: mgmt
+    role: mgmt
+
+  - vid: 443
+    name: mgmtffraum
+    role: ext
