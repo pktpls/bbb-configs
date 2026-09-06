@@ -28,7 +28,7 @@ hosts:
       CONFIG_TARGET_ROOTFS_PARTSIZE: 256
     host__packages__to_merge:
       - parted losetup resize2fs blkid
-      - podman kmod-tun kmod-fuse conmon crun catatonit netavark external-protocol
+      - podman kmod-tun kmod-fuse conmon crun catatonit netavark external-protocol fuse-overlayfs
     host__rclocal__to_merge:
       - "sed -i 's|#firewall_driver|firewall_driver|g' /etc/containers/containers.conf"
       - "sed -i 's|runroot = \".*\"|runroot = \"/opt/run/containers/storage\"|g' /etc/containers/storage.conf"

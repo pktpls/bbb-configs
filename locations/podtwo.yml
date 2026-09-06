@@ -31,7 +31,7 @@ hosts:
     host__packages__to_merge:
       - bash rsync coreutils-stat screen tmux htop mtr git git-http curl jq
       - parted fdisk e2fsprogs btrfs-progs losetup resize2fs coreutils-shred blkid
-      - podman kmod-tun kmod-fuse conmon crun catatonit netavark external-protocol
+      - podman kmod-tun kmod-fuse conmon crun catatonit netavark external-protocol fuse-overlayfs
     host__rclocal__to_merge:
       - "sed -i 's|#firewall_driver|firewall_driver|g' /etc/containers/containers.conf"
       - "sed -i 's|runroot = \".*\"|runroot = \"/opt/run/containers/storage\"|g' /etc/containers/storage.conf"
